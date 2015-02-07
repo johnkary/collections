@@ -20,6 +20,7 @@
 namespace Doctrine\Tests\Common\Collections;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Criteria;
 
 /**
  * Tests for {@see \Doctrine\Common\Collections\ArrayCollection}
@@ -267,5 +268,156 @@ class ArrayCollectionTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(2,    $collection->get(1),              'Get element by index');
         $this->assertSame('a',  $collection->get('A'),            'Get element by name');
         $this->assertSame(null, $collection->get('non-existent'), 'Get non existent element');
+    }
+
+    public function testEnforceOnCreation()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Now an allowed value');
+            }
+        };
+
+        $this->setExpectedException('InvalidArgumentException');
+        new ArrayCollection(array(99, 100), $enforce);
+    }
+
+    public function testEnforceOnAdd()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array(98, 99), $enforce);
+
+        $this->setExpectedException('InvalidArgumentException');
+        $collection->add(100);
+    }
+
+    public function testEnforceOnSet()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array(98, 99), $enforce);
+
+        $this->setExpectedException('InvalidArgumentException');
+        $collection->set(0, 100);
+    }
+
+    public function testEnforcedBehaviorInheritedByNewMappedCollections()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array(20, 40, 60, 80), $enforce);
+        $new = $collection->map(function($element) {
+            return $element + 1;
+        });
+
+        $this->setExpectedException('InvalidArgumentException');
+        $new->set(0, 100);
+    }
+
+    public function testEnforcedOnNewValuesInMappedCollections()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array(20, 40, 60, 80), $enforce);
+
+        $this->setExpectedException('InvalidArgumentException');
+        $collection->map(function($element) {
+            return $element * 2;
+        });
+    }
+
+    public function testEnforcedBehaviorInheritedByNewFilteredCollections()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array(20, 40, 60, 80), $enforce);
+
+        $new = $collection->filter(function($element) {
+            return $element > 50;
+        });
+
+        $this->setExpectedException('InvalidArgumentException');
+        $new->add(100);
+    }
+
+    public function testEnforcedBehaviorInheritedByFirstNewPartitionedCollections()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array(20, 40, 60, 80), $enforce);
+
+        list($new1, $new2) = $collection->partition(function($element) {
+            return $element > 50;
+        });
+
+        $this->setExpectedException('InvalidArgumentException');
+        $new1->add(100);
+    }
+
+    public function testEnforcedBehaviorInheritedBySecondNewPartitionedCollections()
+    {
+        $enforce = function ($element) {
+            if ($element > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array(20, 40, 60, 80), $enforce);
+
+        list($new1, $new2) = $collection->partition(function($element) {
+            return $element > 50;
+        });
+
+        $this->setExpectedException('InvalidArgumentException');
+        $new2->add(100);
+    }
+
+    public function testEnforcedBehaviorInheritedByNewMatchingCollections()
+    {
+        $std1 = new \stdClass();
+        $std1->foo = 20;
+
+        $std2 = new \stdClass();
+        $std2->foo = 40;
+
+        $enforce = function ($element) {
+            if ($element->foo > 99) {
+                throw new \InvalidArgumentException('Not an allowed value');
+            }
+        };
+
+        $collection = new ArrayCollection(array($std1, $std2), $enforce);
+
+        $new = $collection->matching(new Criteria(Criteria::expr()->gt("foo", 30)));
+
+        $std3 = new \stdClass();
+        $std3->foo = 100;
+        $this->setExpectedException('InvalidArgumentException');
+        $new->add($std3);
     }
 }

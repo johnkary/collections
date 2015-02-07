@@ -41,13 +41,28 @@ class ArrayCollection implements Collection, Selectable
     private $elements;
 
     /**
+     * Callback invoked each time an element is added to the Collection.
+     * Should enforce rules required for an element to become a member of this
+     * Collection.
+     *
+     * @var callable
+     */
+    private $enforce;
+
+    /**
      * Initializes a new ArrayCollection.
      *
      * @param array $elements
+     * @param Closure $enforce
      */
-    public function __construct(array $elements = array())
+    public function __construct(array $elements = array(), Closure $enforce = null)
     {
         $this->elements = $elements;
+        $this->enforce = $enforce;
+
+        foreach ($this->elements as $element) {
+            $this->enforceElement($element);
+        }
     }
 
     /**
@@ -248,6 +263,8 @@ class ArrayCollection implements Collection, Selectable
      */
     public function set($key, $value)
     {
+        $this->enforceElement($value);
+
         $this->elements[$key] = $value;
     }
 
@@ -256,6 +273,8 @@ class ArrayCollection implements Collection, Selectable
      */
     public function add($value)
     {
+        $this->enforceElement($value);
+
         $this->elements[] = $value;
 
         return true;
@@ -284,7 +303,7 @@ class ArrayCollection implements Collection, Selectable
      */
     public function map(Closure $func)
     {
-        return new static(array_map($func, $this->elements));
+        return new static(array_map($func, $this->elements), $this->enforce);
     }
 
     /**
@@ -292,7 +311,7 @@ class ArrayCollection implements Collection, Selectable
      */
     public function filter(Closure $p)
     {
-        return new static(array_filter($this->elements, $p));
+        return new static(array_filter($this->elements, $p), $this->enforce);
     }
 
     /**
@@ -324,7 +343,7 @@ class ArrayCollection implements Collection, Selectable
             }
         }
 
-        return array(new static($matches), new static($noMatches));
+        return array(new static($matches, $this->enforce), new static($noMatches, $this->enforce));
     }
 
     /**
@@ -382,6 +401,14 @@ class ArrayCollection implements Collection, Selectable
             $filtered = array_slice($filtered, (int)$offset, $length);
         }
 
-        return new static($filtered);
+        return new static($filtered, $this->enforce);
+    }
+
+    private function enforceElement($element)
+    {
+        if ($this->enforce) {
+            $enforce = $this->enforce;
+            $enforce($element);
+        }
     }
 }
